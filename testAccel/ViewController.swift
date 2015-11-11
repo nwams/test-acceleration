@@ -10,77 +10,85 @@ import UIKit
 import Foundation
 import CoreMotion
 
+
 class ViewController: UIViewController {
     @IBOutlet weak var xAccel: UILabel!
-    
     @IBOutlet weak var yAccel: UILabel!
-    
     @IBOutlet weak var zAccel: UILabel!
+    @IBOutlet weak var timerLabel: UILabel!
     
-    lazy var motionManager = CMMotionManager()
-    var currentMaxAccelX: Double = 0;
-    var currentMaxAccelY: Double = 0;
-    var currentMaxAccelZ: Double = 0;
+    var motionManager : CMMotionManager!
+    var queue : NSOperationQueue!
+    
+    // timer stuff
+    var masterTimer: NSTimer? = nil
+    var timeLeft = 1 //default number of seconds left
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-//        //checking if Accelerometer is available
-//        let manager = CMMotionManager()
-//        
-//        if manager.accelerometerAvailable {
-//            manager.accelerometerUpdateInterval = 0.1
-//            
-//            //Starting Updates to “pull” Data
-//            //after this call, manager.accelerometerData is accessible at any time with the device’s current accelerometer data.
-//            manager.startAccelerometerUpdatesToQueue(NSOperationQueue.mainQueue()) {
-//                [weak self] (data, error) in
-//                
-//                self!.outputAccelertionData(data!.acceleration)
-//                
-//                if (error != nil) {
-//                    print(error)
-//                }
-//            }
-//            
-//            
-//        }
+        // Instantiate these objects to get them ready to use
+        motionManager = CMMotionManager()
+        queue = NSOperationQueue()
+        }
+    
+    
+    @IBAction func startButtonPressed(sender: AnyObject) {
+        // set the number of times the device should update motion data (in seconds)
+        // since 1 / 0.01 will give 100 data points per second
+        motionManager.deviceMotionUpdateInterval = 0.01
         
-        if motionManager.accelerometerAvailable {
-            let queue = NSOperationQueue()
-            motionManager.startAccelerometerUpdatesToQueue(queue, withHandler: {
-                data, error in
+        
+        //start timer that calls countDown every second
+        self.masterTimer = NSTimer.scheduledTimerWithTimeInterval(1.0, target: self, selector: "countDown", userInfo: nil, repeats: true)
+}
+    
+    
+    func countDown(){
+        var valX: Double!
+        var valY: Double!
+        var valZ: Double!
+        var outputRow: String!
+        var myArray = [String]()
+        
+        --timeLeft //take a second away
+        if (timeLeft >= 0)
+        {
+            //update the label if the timeleft is greater than 0
+            self.timerLabel.text = String(timeLeft)
+            
+            // start receiving data by instructing the CMMotionManager object, motionManager, to send us the data
+            // give it the handler, "data", to trigger when data is available
+            motionManager.startAccelerometerUpdatesToQueue(queue, withHandler: { data, error in
+                
                 guard let data = data else{
                     return
                 }
-                    
-                    print("X = \(data.acceleration.x)")
-                    print("Y = \(data.acceleration.y)")
-                    print("Z = \(data.acceleration.z)")
-                    
-                self.xAccel.text = String(data.acceleration.x)
-                self.yAccel.text = String(format: "%.5f", data.acceleration.y)
-                self.zAccel.text = String(format: "%.5f", data.acceleration.z)
+                valX = data.acceleration.x
+                valY = data.acceleration.y
+                valZ = data.acceleration.z
 
-                }
-            )
+                outputRow = "\(valX)" + ",\(valY)" + ",\(valZ)"
+                print (outputRow)
+
+                myArray.append(outputRow)
+            })
         } else {
-            print("Accelerometer is not available")
+            self.timerLabel.text = "Done!" //otherwise let the user know and update the label
+            self.masterTimer!.invalidate() //get rid of timer - game over no longer needed to fire
+            self.masterTimer = nil
+            self.motionManager.stopAccelerometerUpdates()
+            print ("myArray = \(myArray)")
         }
     }
     
-    func outputAccelertionData(acceleration: CMAcceleration) {
-        print ("hello")
-        xAccel.text = String(format: "%.2f", acceleration.x)
-        print (xAccel)
-        
-        if fabs(acceleration.x) > fabs(currentMaxAccelX) {
-            currentMaxAccelX = acceleration.x
-        }
-        
-        
-    }
     
+    override func viewDidDisappear(animated: Bool) {
+        // Important. Stop data collection if the view becomes inactive
+        // if not, it can sit here, chewing up resources on the phone
+        self.motionManager.stopAccelerometerUpdates()
+    }
     
     
     override func didReceiveMemoryWarning() {
